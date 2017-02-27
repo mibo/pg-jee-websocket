@@ -1,13 +1,16 @@
 package de.mirb.pg.jee.ws.client.control;
 
-import javax.websocket.Endpoint;
-import javax.websocket.EndpointConfig;
-import javax.websocket.MessageHandler;
-import javax.websocket.Session;
+import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 import java.util.Stack;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
+import javax.websocket.Endpoint;
+import javax.websocket.EndpointConfig;
+import javax.websocket.MessageHandler;
+import javax.websocket.Session;
 
 /**
  */
@@ -60,5 +63,9 @@ public class MotdTickerEndpoint extends Endpoint {
 
   public int getReceivedMessageCount() {
     return messageStack.size();
+  }
+
+  public List<String> getAllMessages() {
+    return Collections.list(messageStack.elements());
   }
 }
