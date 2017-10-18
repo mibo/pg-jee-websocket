@@ -1,16 +1,20 @@
 package de.mirb.pg.jee.ws.server.boundary;
 
-import javax.ejb.Schedule;
-import javax.ejb.Singleton;
-import javax.ejb.Startup;
-import javax.websocket.OnOpen;
-import javax.websocket.Session;
-import javax.websocket.server.ServerEndpoint;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+
+import javax.ejb.Schedule;
+import javax.ejb.Singleton;
+import javax.ejb.Startup;
+import javax.websocket.OnClose;
+import javax.websocket.OnError;
+import javax.websocket.OnOpen;
+import javax.websocket.Session;
+import javax.websocket.server.ServerEndpoint;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Connect to endpoint via <code>ws://localhost:8080/pg-ws-server/motd</code> (when started with default Payara)
@@ -21,11 +25,7 @@ import java.util.logging.Logger;
 @ServerEndpoint("/motd")
 public class MotdPublisherEndpoint {
 
-  private static final Logger LOG = Logger.getLogger(MotdPublisherEndpoint.class.getName());
-
-  public MotdPublisherEndpoint() {
-    LOG.setLevel(Level.ALL);
-  }
+  private static final Logger LOG = LoggerFactory.getLogger(MotdPublisherEndpoint.class.getName());
 
   private Session session;
   private String messageOfTheDay = "Using WebSockets @JEE";
@@ -33,7 +33,19 @@ public class MotdPublisherEndpoint {
 
   @OnOpen
   public void open(Session session) {
+    LOG.info("Open session ({})...", session.getId());
     this.session = session;
+  }
+
+  @OnClose
+  public void close(Session session) {
+    LOG.info("Close session ({})...", session.getId());
+    this.session = null;
+  }
+
+  @OnError
+  public void onError(Throwable error) {
+    LOG.error("Got an error: {}", error.getMessage());
   }
 
   public void publishMotd(String motd) {
@@ -41,7 +53,7 @@ public class MotdPublisherEndpoint {
       try {
         session.getBasicRemote().sendText(motd);
       } catch (IOException e) {
-        LOG.log(Level.SEVERE, "Error during MOTD publish.", e);
+        LOG.error("Error during MOTD publish: " + e.getMessage(), e);
       }
     }
   }
@@ -51,7 +63,7 @@ public class MotdPublisherEndpoint {
     String date = SDF.format(new Date());
     String motdToPub = "Message of " + date + ": " + messageOfTheDay;
     publishMotd(motdToPub);
-    LOG.log(Level.INFO, "Published: " + motdToPub);
+    LOG.info("Published: {}", motdToPub);
   }
 
   private boolean isSessionReady() {
