@@ -23,6 +23,11 @@ import java.util.logging.Logger;
 @Singleton
 public class MotdTicker {
 
+  // default for e.g. TomEE server deployment (with application path '/')
+//  public static final String MOTD_ENDPOINT_ADDRESS = "ws://localhost:8080/server/motd";
+  // default for e.g. plain Payara or Wildfly server deployment
+  public static final String MOTD_ENDPOINT_ADDRESS = "ws://localhost:8080/pg-ws-server/motd";
+
   private WebSocketContainer container;
 
   private static final Logger LOG = Logger.getLogger(MotdTicker.class.getName());
@@ -39,7 +44,7 @@ public class MotdTicker {
     container = ContainerProvider.getWebSocketContainer();
 
     try {
-      URI uri = new URI("ws://localhost:8080/pg-ws-server/motd");
+      URI uri = new URI(MOTD_ENDPOINT_ADDRESS);
       LOG.info("Connect to uri (" + uri.toString() + ")...");
       motdEndpoint = new MotdTickerEndpoint();
       container.connectToServer(motdEndpoint, cec, uri);

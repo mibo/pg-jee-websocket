@@ -18,6 +18,8 @@ This `WebSockets Playground` project is just a playground for my personal JEE sa
 == Technical information
   * The release versions are based on link:http://semver.org[Semantic Versioning 2.0.0].
   * The latest release require `JavaEE 7` (or newer) and is build with link:https://maven.apache.org[Maven] (version `3.3.x`).
+  * Server tested (and working) with `Payara 4.1` and `Wildfly 11`
+  * Client tested (and working) with `TomEE 7` and `Wildfly 11`
 
 === Server part
 

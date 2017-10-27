@@ -7,9 +7,9 @@
     </layout>
   </appender>
 
-  <logger name="de.mirb.pg" level="INFO"/>
+  <logger name="de.mirb.pg" level="DEBUG"/>
 
-  <root level="TRACE">
+  <root level="WARN">
     <appender-ref ref="STDOUT" />
   </root>
 </configuration>

@@ -8,7 +8,7 @@ import javax.ws.rs.core.Application;
  * Delete this class, if you are not exposing
  * JAX-RS resources in your application.
  */
-@ApplicationPath("server")
+@ApplicationPath("/server")
 public class JAXRSConfiguration extends Application {
 
 }

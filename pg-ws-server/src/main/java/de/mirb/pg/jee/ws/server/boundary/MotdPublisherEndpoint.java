@@ -63,7 +63,7 @@ public class MotdPublisherEndpoint {
     String date = SDF.format(new Date());
     String motdToPub = "Message of " + date + ": " + messageOfTheDay;
     publishMotd(motdToPub);
-    LOG.info("Published: {}", motdToPub);
+    LOG.trace("Published: {}", motdToPub);
   }
 
   private boolean isSessionReady() {
