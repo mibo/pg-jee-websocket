@@ -58,7 +58,7 @@ public class MotdPublisherEndpoint {
     }
   }
 
-  @Schedule(hour = "*", minute = "*", second = "*/5")
+//  @Schedule(hour = "*", minute = "*", second = "*/5")
   public void publish() {
     String date = SDF.format(new Date());
     String motdToPub = "Message of " + date + ": " + messageOfTheDay;

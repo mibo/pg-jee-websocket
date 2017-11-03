@@ -7,6 +7,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
+import java.nio.charset.StandardCharsets;
 
 import javax.ejb.Singleton;
 import javax.ejb.Startup;
@@ -22,7 +23,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Connect to endpoint via <code>ws://localhost:8080/pg-ws-server/motd</code> (when started with default Payara)
+ * Connect to endpoint via <code>ws://localhost:8080/pg-ws-server/ws/bin</code> (when started with default Payara)
  * and a generic Web Socket Client.
  */
 @Startup
@@ -35,32 +36,44 @@ public class BinaryForwardEndpoint {
   public static final int FWD_SOCKET_PORT = 35672;
 
   private Session session;
+  private SocketChannel socket;
 
   @OnOpen
   public void open(Session session) {
     LOG.info("Open session ({})...", session.getId());
     this.session = session;
+//    session.getContainer().setDefaultMaxBinaryMessageBufferSize(10);
+    // start each session with a new socket connection
+    this.socket = null;
   }
 
   @OnClose
   public void close(Session session) {
     LOG.info("Close session ({})...", session.getId());
-    this.session = null;
+    close();
   }
 
   @OnError
   public void onError(Throwable error) {
     LOG.error("Got an error: {}", error.getMessage());
+    close();
   }
 
   @OnMessage
   public void handleMessage(ByteBuffer message, Session session) {
     LOG.info("Received binary message...");
-    String messageContent = new String(message.array());
-    LOG.info(messageContent);
+    String messageContent = readAsString(message);
+    LOG.info("Content (size={}bytes): {}", messageContent.length(), messageContent);
     forwardSc(message);
 //    response();
-    close();
+//    close();
+  }
+
+  private String readAsString(ByteBuffer byteBuffer) {
+    ByteBuffer b = byteBuffer.duplicate();
+    byte[] tmp = new byte[b.limit()];
+    b.get(tmp);
+    return new String(tmp, StandardCharsets.US_ASCII);
   }
 
   private void close() {
@@ -69,7 +82,22 @@ public class BinaryForwardEndpoint {
         this.session.close();
       } catch (IOException e) {
         e.printStackTrace();
+        LOG.error("Failed to close session: " + e.getMessage(), e);
+      } finally {
+        this.session = null;
       }
+    }
+    //
+    if(socket != null) {
+      try {
+        socket.close();
+      } catch (IOException e) {
+        e.printStackTrace();
+        LOG.error("Failed to close socket: " + e.getMessage(), e);
+      } finally {
+        socket = null;
+      }
+
     }
   }
 
@@ -94,40 +122,87 @@ public class BinaryForwardEndpoint {
 
   private void forwardSc(ByteBuffer content) {
     try {
-      SocketChannel socket = SocketChannel.open();
-      socket.configureBlocking(false);
-      Selector selector = Selector.open();
-      final SelectionKey key = socket.register(selector, SelectionKey.OP_CONNECT, this);
-      SocketAddress sa = new InetSocketAddress(FWD_SOCKET_HOST, FWD_SOCKET_PORT);
-      socket.connect(sa);
-      socket.finishConnect();
-      socket.write(content);
+      LOG.info("Start forward...");
+      SocketChannel socket = grantSocketChannel();
 
-      ByteBuffer read = ByteBuffer.allocate(1024);
-      int r = socket.read(read);
-      while(r > 0) {
-        // handle read more then buffer size
-        r = socket.read(read);
+      while(content.hasRemaining()) {
+        LOG.info("Write content...");
+        socket.write(content);
       }
+
+      ByteBuffer read = ByteBuffer.allocate(1024*64);
+      LOG.info("Read response...");
+      int readCount = socket.read(read);
+      if(readCount == 0) {
+        LOG.info("Re-Read...");
+        silentSleep(100);
+        // handle read more then buffer size
+        readCount = socket.read(read);
+      }
+      LOG.info("Read ({}bytes)...", readCount);
+      LOG.info("Write ws response...");
       wsResponse(read);
+      LOG.info("...wrote ws response.");
     } catch (IOException e) {
       e.printStackTrace();
       LOG.error("Exception occurred: " + e.getMessage(), e);
     }
   }
 
+  private void silentSleep(int sleepMs) {
+    try {
+      Thread.sleep(sleepMs);
+    } catch (InterruptedException e) {
+      //e.printStackTrace();
+    }
+  }
+
+  private synchronized SocketChannel grantSocketChannel() throws IOException {
+    if(socket == null) {
+      LOG.info("Create new socket...");
+      socket = SocketChannel.open();
+      socket.configureBlocking(false);
+      SocketAddress sa = new InetSocketAddress(FWD_SOCKET_HOST, FWD_SOCKET_PORT);
+      LOG.info("Connect to ({}:{})...", FWD_SOCKET_HOST, FWD_SOCKET_PORT);
+      socket.connect(sa);
+      while(!socket.finishConnect()) {
+        silentSleep(100);
+      }
+      LOG.info("Successful connected to ({}:{})...", FWD_SOCKET_HOST, FWD_SOCKET_PORT);
+    }
+    return socket;
+  }
+
   public void wsResponse(ByteBuffer buffer) {
+    wsSyncResponse(buffer);
+//    wsAsyncResponse(buffer);
+  }
+
+  public void wsSyncResponse(ByteBuffer buffer) {
     if (isSessionReady()) {
       try {
         buffer.flip();
+        LOG.info("Send response (content='{}')...", readAsString(buffer));
         final RemoteEndpoint.Basic remote = session.getBasicRemote();
         remote.sendBinary(buffer);
-        LOG.info("Send response...");
+        LOG.info("...successful send response.");
       } catch (IOException e) {
         //we ignore this
         e.printStackTrace();
         LOG.error("Exception occurred: " + e.getMessage(), e);
       }
+    }
+  }
+
+  public void wsAsyncResponse(ByteBuffer buffer) {
+    if (isSessionReady()) {
+      buffer.flip();
+      LOG.info("Send async response (content='{}')...", readAsString(buffer));
+      //        final RemoteEndpoint.Basic remote = session.getBasicRemote();
+      RemoteEndpoint.Async asremote = session.getAsyncRemote();
+      asremote.sendBinary(buffer);
+      //        remote.sendBinary(buffer);
+      LOG.info("...successful send response.");
     }
   }
 
